@@ -1,23 +1,37 @@
-import { FC, useMemo } from 'react';
+import { FC, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Preloader } from '../ui/preloader';
 import { OrderInfoUI } from '../ui/order-info';
 import { TIngredient } from '@utils-types';
-import { useSelector } from '../../services/store';
+import { useSelector, useDispatch } from '../../services/store';
+import { getOrderByNumber } from '../../services/slices/orderSlice';
 
 export const OrderInfo: FC = () => {
   const { number } = useParams<{ number: string }>();
+  const dispatch = useDispatch();
 
   const { ingredients } = useSelector((state) => state.ingredients);
 
-  // достаем заказы из 2х сторов лента и личные т.к. мы не знаем откуда пришел юзер
+  // достаем заказы из ленты, личного кабинета и отдельного просмотра
   const feedOrders = useSelector((state) => state.feed.orders);
   const profileOrders = useSelector((state) => state.profileOrders.orders);
+  const requestedOrder = useSelector((state) => state.order.orderModalData);
 
   const orderData = useMemo(() => {
     const allOrders = [...feedOrders, ...profileOrders];
-    return allOrders.find((order) => order.number === Number(number));
-  }, [number, feedOrders, profileOrders]);
+    // ищем в загруженных списках или же берем тот, который запросили напрямую
+    return (
+      allOrders.find((order) => order.number === Number(number)) ||
+      requestedOrder
+    );
+  }, [number, feedOrders, profileOrders, requestedOrder]);
+
+  // если данные о заказе отсутствуют в сторе, то запрашиваем их с сервера
+  useEffect(() => {
+    if (!orderData && number) {
+      dispatch(getOrderByNumber(Number(number)));
+    }
+  }, [dispatch, orderData, number]);
 
   const orderInfo = useMemo(() => {
     if (!orderData || !ingredients.length) return null;
